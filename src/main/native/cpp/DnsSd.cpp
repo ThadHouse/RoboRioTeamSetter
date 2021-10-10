@@ -2,7 +2,7 @@
 
 #include <dns_sd.h>
 #include "DnsFinder.h"
-#include <iostream>
+#include <stdio.h>
 #include <wpi/SmallString.h>
 #include <thread>
 
@@ -60,6 +60,8 @@ static void DnsCompletion(DNSServiceRef sdRef, DNSServiceFlags flags,
 }
 
 bool DnsFinder::StartSearch() {
+  setenv("AVAHI_COMPAT_NOWARN", "1", 0);
+
   DNSServiceErrorType status = DNSServiceBrowse(
       &pImpl->ServiceRef, 0, 0, "_ni-rt._tcp", "local", DnsCompletion, this);
   if (status == kDNSServiceErr_NoError) {
