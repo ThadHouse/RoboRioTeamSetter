@@ -10,6 +10,13 @@
 
 #pragma comment(lib, "dnsapi.lib")
 
+struct DnsFinder::Impl {
+  DNS_SERVICE_CANCEL ServiceCancel;
+};
+
+DnsFinder::DnsFinder() : pImpl{std::make_unique<Impl>()} {};
+DnsFinder::~DnsFinder() {}
+
 static _Function_class_(DNS_QUERY_COMPLETION_ROUTINE) VOID WINAPI
     DnsCompletion(_In_ PVOID pQueryContext,
                   _Inout_ PDNS_QUERY_RESULT pQueryResults) {
@@ -37,11 +44,11 @@ bool DnsFinder::StartSearch() {
   request.Version = 2;
   request.pBrowseCallbackV2 = DnsCompletion;
   DNS_STATUS status = DnsServiceBrowse(
-      &request, reinterpret_cast<PDNS_SERVICE_CANCEL>(&cancelRequest));
+      &request, &pImpl->ServiceCancel);
   return status == DNS_REQUEST_PENDING;
 }
 
 void DnsFinder::StopSearch() {
-  DnsServiceBrowseCancel(static_cast<PDNS_SERVICE_CANCEL>(cancelRequest));
+  DnsServiceBrowseCancel(&pImpl->ServiceCancel);
 }
 #endif

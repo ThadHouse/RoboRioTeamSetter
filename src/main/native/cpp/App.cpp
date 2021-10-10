@@ -118,10 +118,10 @@ void Application() {
 
   ssh_init();
 
-  DnsFinder WinDns;
+  DnsFinder DnsResolver;
 
-  WinDns.SetOnFound(OnDnsFound);
-  WinDns.StartSearch();
+  DnsResolver.SetOnFound(OnDnsFound);
+  DnsResolver.StartSearch();
 
   gui::ConfigurePlatformSaveFile("teamnumbersetter.ini");
 
@@ -130,7 +130,7 @@ void Application() {
 
   gui::Main();
 
-  WinDns.StopSearch();
+  DnsResolver.StopSearch();
 
   glass::DestroyContext();
   gui::DestroyContext();

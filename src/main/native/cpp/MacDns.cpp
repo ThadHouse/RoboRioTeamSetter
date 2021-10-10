@@ -1,3 +1,5 @@
+#ifdef __APPLE__
+
 #include <dns_sd.h>
 #include "DnsFinder.h"
 #include <iostream>
@@ -6,7 +8,6 @@
 
 struct DnsFinder::Impl {
   DNSServiceRef ServiceRef = nullptr;
-  dnssd_sock_t ServiceSock;
   std::thread Thread;
 
   void ThreadMain() {
@@ -74,3 +75,5 @@ void DnsFinder::StopSearch() {
   if (pImpl->Thread.joinable())
     pImpl->Thread.join();
 }
+
+#endif
