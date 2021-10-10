@@ -93,7 +93,9 @@ static void DisplayGui() {
     for (auto&& i : foundDevices) {
       ImGui::Text("%s", i.second.c_str());
       ImGui::NextColumn();
-      ImGui::Text("%d", i.first);
+      struct in_addr in;
+      in.s_addr = i.first;
+      ImGui::Text("%s", inet_ntoa(in));
       ImGui::NextColumn();
       if (ImGui::Button(setString.c_str())) {
         // TODO
