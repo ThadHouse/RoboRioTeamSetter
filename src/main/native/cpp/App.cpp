@@ -5,6 +5,10 @@
 #include <memory>
 #include <string_view>
 
+#ifndef _WIN32
+#include <arpa/inet.h>
+#endif
+
 #include <fmt/format.h>
 #include <glass/Context.h>
 #include <glass/Window.h>
