@@ -12,11 +12,11 @@
 #include <glass/other/Log.h>
 #include <imgui.h>
 #include <libssh/libssh.h>
-//#include <uv.h>
 #include <wpi/Logger.h>
 #include <wpi/fs.h>
 #include <wpigui.h>
-#include "WindowsDns.h"
+#include "DnsFinder.h"
+#include <unordered_map>
 #include <mutex>
 
 namespace gui = wpi::gui;
@@ -107,7 +107,7 @@ void Application() {
 
   ssh_init();
 
-  WindowsDns WinDns;
+  DnsFinder WinDns;
 
   WinDns.SetOnFound(OnDnsFound);
   WinDns.StartSearch();
@@ -120,6 +120,8 @@ void Application() {
   gui::Main();
 
   WinDns.StopSearch();
+
+  printf("Stopping search\n");
 
   glass::DestroyContext();
   gui::DestroyContext();
