@@ -1,4 +1,4 @@
-#ifdef __APPLE__
+#ifndef _WIN32
 
 #include <dns_sd.h>
 #include "DnsFinder.h"
@@ -20,7 +20,7 @@ struct DnsFinder::Impl {
   }
 };
 
-DnsFinder::DnsFinder() : pImpl{std::make_unique<Impl>()} {};
+DnsFinder::DnsFinder() : pImpl{std::make_unique<Impl>()} {}
 DnsFinder::~DnsFinder() {}
 
 static void ServiceQueryRecordReply(DNSServiceRef sdRef, DNSServiceFlags flags,

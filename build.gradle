@@ -153,7 +153,7 @@ model {
             'CoreFoundation' << '-framework' << 'CoreVideo' << '-framework' << 'QuartzCore'
         it.linker.args << '-framework' << 'Kerberos'
       } else {
-        it.linker.args << '-lX11'
+        it.linker.args << '-lX11' << '-ldns_sd'
       }
 
       // Define NDEBUG in Release Mode (needed for proper wpi::Logger functionality).

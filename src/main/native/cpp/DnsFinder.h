@@ -1,5 +1,6 @@
 #include <functional>
 #include <string>
+#include <memory>
 
 class DnsFinder {
  public:
