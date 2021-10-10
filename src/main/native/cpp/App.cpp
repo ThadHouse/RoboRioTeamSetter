@@ -18,6 +18,7 @@
 #include "DnsFinder.h"
 #include <unordered_map>
 #include <mutex>
+#include "wpi/SmallString.h"
 
 namespace gui = wpi::gui;
 
@@ -76,12 +77,16 @@ static void DisplayGui() {
     teamNumber = 0;
   }
 
-  ImGui::Columns(2, "Devices");
+  ImGui::Columns(3, "Devices");
   ImGui::Text("Name");
   ImGui::NextColumn();
   ImGui::Text("IP Address");
   ImGui::NextColumn();
+  ImGui::Text("Set");
+  ImGui::NextColumn();
   ImGui::Separator();
+
+  std::string setString = fmt::format("Set team to {}", teamNumber);
 
   {
     std::scoped_lock lock{devicesLock};
@@ -89,6 +94,12 @@ static void DisplayGui() {
       ImGui::Text("%s", i.second.c_str());
       ImGui::NextColumn();
       ImGui::Text("%d", i.first);
+      ImGui::NextColumn();
+      if (ImGui::Button(setString.c_str())) {
+        // TODO
+        printf("Hello\n");
+        fflush(stdout);
+      }
       ImGui::NextColumn();
     }
   }
@@ -120,8 +131,6 @@ void Application() {
   gui::Main();
 
   WinDns.StopSearch();
-
-  printf("Stopping search\n");
 
   glass::DestroyContext();
   gui::DestroyContext();
