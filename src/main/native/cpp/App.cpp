@@ -16,6 +16,8 @@
 #include <wpi/Logger.h>
 #include <wpi/fs.h>
 #include <wpigui.h>
+#include "WindowsDns.h"
+#include <mutex>
 
 namespace gui = wpi::gui;
 
@@ -25,68 +27,100 @@ const char* GetWPILibVersion();
 GLFWAPI void glfwGetWindowSize(GLFWwindow* window, int* width, int* height);
 
 int teamNumber;
+std::unordered_map<unsigned int, std::string> foundDevices;
+std::mutex devicesLock;
 
 static void DisplayGui() {
-    ImGui::GetStyle().WindowRounding = 0;
+  ImGui::GetStyle().WindowRounding = 0;
 
-    // fill entire OS window with this window
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    int width, height;
-    glfwGetWindowSize(gui::GetSystemWindow(), &width, &height);
-    ImGui::SetNextWindowSize(ImVec2(width, height));
+  // fill entire OS window with this window
+  ImGui::SetNextWindowPos(ImVec2(0, 0));
+  int width, height;
+  glfwGetWindowSize(gui::GetSystemWindow(), &width, &height);
+  ImGui::SetNextWindowSize(ImVec2(width, height));
 
-    ImGui::Begin("Entries", nullptr,
-            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_MenuBar |
-                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                ImGuiWindowFlags_NoCollapse);
+  ImGui::Begin("Entries", nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_MenuBar |
+                   ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                   ImGuiWindowFlags_NoCollapse);
 
-    ImGui::BeginMainMenuBar();
-    gui::EmitViewMenu();
+  ImGui::BeginMenuBar();
+  gui::EmitViewMenu();
 
-    bool about = false;
-    if (ImGui::BeginMenu("Info")) {
-      if (ImGui::MenuItem("About")) {
-        about = true;
-      }
-      ImGui::EndMenu();
+  bool about = false;
+  if (ImGui::BeginMenu("Info")) {
+    if (ImGui::MenuItem("About")) {
+      about = true;
     }
-    ImGui::EndMainMenuBar();
+    ImGui::EndMenu();
+  }
+  ImGui::EndMenuBar();
 
-    ImGui::InputInt("Team Number", &teamNumber);
+  if (about) {
+    ImGui::OpenPopup("About");
+    about = false;
+  }
+  if (ImGui::BeginPopupModal("About")) {
+    ImGui::Text("roboRIO Team Number Setter");
+    ImGui::Separator();
+    ImGui::Text("v%s", GetWPILibVersion());
+    if (ImGui::Button("Close")) {
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+  }
 
-    if (teamNumber < 0) {
-        teamNumber = 0;
-    }
+  ImGui::InputInt("Team Number", &teamNumber);
 
-    if (about) {
-      ImGui::OpenPopup("About");
-      about = false;
+  if (teamNumber < 0) {
+    teamNumber = 0;
+  }
+
+  ImGui::Columns(2, "Devices");
+  ImGui::Text("Name");
+  ImGui::NextColumn();
+  ImGui::Text("IP Address");
+  ImGui::NextColumn();
+  ImGui::Separator();
+
+  {
+    std::scoped_lock lock{devicesLock};
+    for (auto&& i : foundDevices) {
+      ImGui::Text("%s", i.second.c_str());
+      ImGui::NextColumn();
+      ImGui::Text("%d", i.first);
+      ImGui::NextColumn();
     }
-    if (ImGui::BeginPopupModal("About")) {
-      ImGui::Text("roboRIO Team Number Setter");
-      ImGui::Separator();
-      ImGui::Text("v%s", GetWPILibVersion());
-      if (ImGui::Button("Close")) {
-        ImGui::CloseCurrentPopup();
-      }
-      ImGui::EndPopup();
-    }
-    ImGui::End();
+  }
+  ImGui::Columns();
+  ImGui::End();
+}
+
+void OnDnsFound(unsigned int ipAddress, std::string_view name) {
+  std::scoped_lock lock{devicesLock};
+  foundDevices[ipAddress] = std::string(name);
 }
 
 void Application() {
-    gui::CreateContext();
-    glass::CreateContext();
+  gui::CreateContext();
+  glass::CreateContext();
 
-    ssh_init();
+  ssh_init();
 
-    gui::ConfigurePlatformSaveFile("teamnumbersetter.ini");
+  WindowsDns WinDns;
 
-    gui::AddLateExecute(DisplayGui);
-    gui::Initialize("roboRIO Team Number Setter", 600, 400);
+  WinDns.SetOnFound(OnDnsFound);
+  WinDns.StartSearch();
 
-    gui::Main();
+  gui::ConfigurePlatformSaveFile("teamnumbersetter.ini");
 
-    glass::DestroyContext();
-    gui::DestroyContext();
+  gui::AddLateExecute(DisplayGui);
+  gui::Initialize("roboRIO Team Number Setter", 600, 400);
+
+  gui::Main();
+
+  WinDns.StopSearch();
+
+  glass::DestroyContext();
+  gui::DestroyContext();
 }
