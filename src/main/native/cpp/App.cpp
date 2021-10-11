@@ -33,7 +33,7 @@ const char* GetWPILibVersion();
 GLFWAPI void glfwGetWindowSize(GLFWwindow* window, int* width, int* height);
 
 int teamNumber;
-std::unordered_map<unsigned int, std::string> foundDevices;
+std::unordered_map<std::string, std::pair<unsigned int, std::string>> foundDevices;
 std::mutex devicesLock;
 
 static void DisplayGui() {
@@ -82,8 +82,10 @@ static void DisplayGui() {
     teamNumber = 0;
   }
 
-  ImGui::Columns(3, "Devices");
+  ImGui::Columns(4, "Devices");
   ImGui::Text("Name");
+  ImGui::NextColumn();
+  ImGui::Text("MAC Address");
   ImGui::NextColumn();
   ImGui::Text("IP Address");
   ImGui::NextColumn();
@@ -96,10 +98,12 @@ static void DisplayGui() {
   {
     std::scoped_lock lock{devicesLock};
     for (auto&& i : foundDevices) {
-      ImGui::Text("%s", i.second.c_str());
+      ImGui::Text("%s", i.second.second.c_str());
+      ImGui::NextColumn();
+      ImGui::Text("%s", i.first.c_str());
       ImGui::NextColumn();
       struct in_addr in;
-      in.s_addr = i.first;
+      in.s_addr = i.second.first;
       ImGui::Text("%s", inet_ntoa(in));
       ImGui::NextColumn();
       if (ImGui::Button(setString.c_str())) {
@@ -114,9 +118,9 @@ static void DisplayGui() {
   ImGui::End();
 }
 
-void OnDnsFound(unsigned int ipAddress, std::string_view name) {
+void OnDnsFound(const std::string& macAddress, unsigned int ipAddress, std::string_view name) {
   std::scoped_lock lock{devicesLock};
-  foundDevices[ipAddress] = std::string(name);
+  foundDevices[macAddress] = std::make_pair(ipAddress, std::string(name));
 }
 
 void Application() {

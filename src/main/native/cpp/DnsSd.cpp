@@ -8,6 +8,7 @@
 #include <vector>
 #include <poll.h>
 #include <atomic>
+#include <netinet/in.h>
 
 struct DnsResolveState {
   DnsResolveState(DnsFinder* finder) : Finder{finder} {}
@@ -71,23 +72,47 @@ struct DnsFinder::Impl {
 DnsFinder::DnsFinder() : pImpl{std::make_unique<Impl>()} {}
 DnsFinder::~DnsFinder() {}
 
-static void ServiceQueryRecordReply(DNSServiceRef sdRef, DNSServiceFlags flags,
-                                    uint32_t interfaceIndex,
-                                    DNSServiceErrorType errorCode,
-                                    const char* fullname, uint16_t rrtype,
-                                    uint16_t rrclass, uint16_t rdlen,
-                                    const void* rdata, uint32_t ttl,
-                                    void* context) {
-  if (rdlen != 4 || rrtype != kDNSServiceType_A) {
+// static void ServiceQueryRecordReply(DNSServiceRef sdRef, DNSServiceFlags
+// flags,
+//                                     uint32_t interfaceIndex,
+//                                     DNSServiceErrorType errorCode,
+//                                     const char* fullname, uint16_t rrtype,
+//                                     uint16_t rrclass, uint16_t rdlen,
+//                                     const void* rdata, uint32_t ttl,
+//                                     void* context) {
+//   if (rdlen != 4 || rrtype != kDNSServiceType_A) {
+//     return;
+//   }
+
+//   DnsResolveState* resolveState = static_cast<DnsResolveState*>(context);
+//   printf("%s\n", resolveState->MacAddress.c_str());
+//   fflush(stdout);
+
+//   resolveState->Finder->OnFound(*static_cast<const unsigned int*>(rdata),
+//                                 fullname);
+
+//   resolveState->Finder->pImpl->ResolveStates.erase(std::find_if(
+//       resolveState->Finder->pImpl->ResolveStates.begin(),
+//       resolveState->Finder->pImpl->ResolveStates.end(),
+//       [resolveState](auto& a) { return a.get() == resolveState; }));
+// }
+
+void ServiceGetAddrInfoReply(DNSServiceRef sdRef, DNSServiceFlags flags,
+                             uint32_t interfaceIndex,
+                             DNSServiceErrorType errorCode,
+                             const char* hostname,
+                             const struct sockaddr* address, uint32_t ttl,
+                             void* context) {
+  if (errorCode != kDNSServiceErr_NoError) {
     return;
   }
 
   DnsResolveState* resolveState = static_cast<DnsResolveState*>(context);
-  printf("%s\n", resolveState->MacAddress.c_str());
-  fflush(stdout);
 
-  resolveState->Finder->OnFound(*static_cast<const unsigned int*>(rdata),
-                                fullname);
+  resolveState->Finder->OnFound(
+      resolveState->MacAddress,
+      reinterpret_cast<const struct sockaddr_in*>(address)->sin_addr.s_addr,
+      hostname);
 
   resolveState->Finder->pImpl->ResolveStates.erase(std::find_if(
       resolveState->Finder->pImpl->ResolveStates.begin(),
@@ -110,11 +135,16 @@ void ServiceResolveReply(DNSServiceRef sdRef, DNSServiceFlags flags,
   resolveState->ResolveRef = nullptr;
   resolveState->ResolveSocket = 0;
 
-  resolveState->MacAddress = std::string(txtRecord, txtRecord + txtLen);
+  if (TXTRecordContainsKey(txtLen, txtRecord, "MAC")) {
+    uint8_t macLen = 0;
+    const char* macRaw = static_cast<const char*>(
+        TXTRecordGetValuePtr(txtLen, txtRecord, "MAC", &macLen));
+    resolveState->MacAddress = std::string(macRaw, macRaw + macLen);
+  }
 
-  errorCode = DNSServiceQueryRecord(
-      &resolveState->ResolveRef, flags, interfaceIndex, hosttarget,
-      kDNSServiceType_A, kDNSServiceClass_IN, ServiceQueryRecordReply, context);
+  errorCode = DNSServiceGetAddrInfo(
+      &resolveState->ResolveRef, flags, interfaceIndex,
+      kDNSServiceProtocol_IPv4, hosttarget, ServiceGetAddrInfoReply, context);
 
   if (errorCode == kDNSServiceErr_NoError) {
     resolveState->ResolveSocket = DNSServiceRefSockFD(resolveState->ResolveRef);
