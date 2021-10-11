@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <mutex>
 #include "wpi/SmallString.h"
+#include "DeploySession.h"
 
 namespace gui = wpi::gui;
 
