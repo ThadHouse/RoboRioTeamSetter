@@ -70,7 +70,7 @@ void DeploySession::Execute(wpi::uv::Loop& lp) {
       } catch (const SshSession::SshException& e) {
         ERROR("An exception occurred: {}", e.what());
       }
-    } catch (const SshSession::SshSession& e) {
+    } catch (const SshSession::SshException& e) {
       DEBUG("SSH connection to {} failed.", ip);
     }
   });

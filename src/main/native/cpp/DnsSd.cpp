@@ -5,18 +5,66 @@
 #include <stdio.h>
 #include <wpi/SmallString.h>
 #include <thread>
+#include <vector>
+#include <poll.h>
+#include <atomic>
+
+struct DnsResolveState {
+  DnsResolveState(DnsFinder* finder) : Finder{finder} {}
+  ~DnsResolveState() {
+    if (ResolveRef != nullptr) {
+      DNSServiceRefDeallocate(ResolveRef);
+    }
+  }
+
+  DNSServiceRef ResolveRef = nullptr;
+  dnssd_sock_t ResolveSocket;
+
+  DnsFinder* Finder;
+
+  std::string MacAddress;
+};
 
 struct DnsFinder::Impl {
   DNSServiceRef ServiceRef = nullptr;
+  dnssd_sock_t ServiceQuerySocket;
+  std::vector<std::unique_ptr<DnsResolveState>> ResolveStates;
   std::thread Thread;
+  std::atomic_bool running;
 
   void ThreadMain() {
+    std::vector<pollfd> readSockets;
+    std::vector<DNSServiceRef> serviceRefs;
     while (true) {
-      DNSServiceErrorType error = DNSServiceProcessResult(ServiceRef);
-      if (error != kDNSServiceErr_NoError) {
+      readSockets.clear();
+      serviceRefs.clear();
+
+      readSockets.emplace_back(pollfd{ServiceQuerySocket, POLLIN, 0});
+      serviceRefs.emplace_back(ServiceRef);
+
+      for (auto&& i : ResolveStates) {
+        readSockets.emplace_back(pollfd{i->ResolveSocket, POLLIN, 0});
+        serviceRefs.emplace_back(i->ResolveRef);
+      }
+
+      int res = poll(readSockets.begin().base(), readSockets.size(), 100);
+
+      if (res > 0) {
+        for (size_t i = 0; i < readSockets.size(); i++) {
+          if (readSockets[i].revents == POLLIN) {
+            DNSServiceProcessResult(serviceRefs[i]);
+          }
+        }
+      } else if (res == 0) {
+        if (!running) {
+          break;
+        }
+      } else {
         break;
       }
     }
+    ResolveStates.clear();
+    DNSServiceRefDeallocate(ServiceRef);
   }
 };
 
@@ -34,8 +82,48 @@ static void ServiceQueryRecordReply(DNSServiceRef sdRef, DNSServiceFlags flags,
     return;
   }
 
-  static_cast<DnsFinder*>(context)->OnFound(
-      *static_cast<const unsigned int*>(rdata), fullname);
+  DnsResolveState* resolveState = static_cast<DnsResolveState*>(context);
+  printf("%s\n", resolveState->MacAddress.c_str());
+  fflush(stdout);
+
+  resolveState->Finder->OnFound(*static_cast<const unsigned int*>(rdata),
+                                fullname);
+
+  resolveState->Finder->pImpl->ResolveStates.erase(std::find_if(
+      resolveState->Finder->pImpl->ResolveStates.begin(),
+      resolveState->Finder->pImpl->ResolveStates.end(),
+      [resolveState](auto& a) { return a.get() == resolveState; }));
+}
+
+void ServiceResolveReply(DNSServiceRef sdRef, DNSServiceFlags flags,
+                         uint32_t interfaceIndex, DNSServiceErrorType errorCode,
+                         const char* fullname, const char* hosttarget,
+                         uint16_t port, /* In network byte order */
+                         uint16_t txtLen, const unsigned char* txtRecord,
+                         void* context) {
+  if (errorCode != kDNSServiceErr_NoError) {
+    return;
+  }
+
+  DnsResolveState* resolveState = static_cast<DnsResolveState*>(context);
+  DNSServiceRefDeallocate(resolveState->ResolveRef);
+  resolveState->ResolveRef = nullptr;
+  resolveState->ResolveSocket = 0;
+
+  resolveState->MacAddress = std::string(txtRecord, txtRecord + txtLen);
+
+  errorCode = DNSServiceQueryRecord(
+      &resolveState->ResolveRef, flags, interfaceIndex, hosttarget,
+      kDNSServiceType_A, kDNSServiceClass_IN, ServiceQueryRecordReply, context);
+
+  if (errorCode == kDNSServiceErr_NoError) {
+    resolveState->ResolveSocket = DNSServiceRefSockFD(resolveState->ResolveRef);
+  } else {
+    resolveState->Finder->pImpl->ResolveStates.erase(std::find_if(
+        resolveState->Finder->pImpl->ResolveStates.begin(),
+        resolveState->Finder->pImpl->ResolveStates.end(),
+        [resolveState](auto& a) { return a.get() == resolveState; }));
+  }
 }
 
 static void DnsCompletion(DNSServiceRef sdRef, DNSServiceFlags flags,
@@ -46,17 +134,26 @@ static void DnsCompletion(DNSServiceRef sdRef, DNSServiceFlags flags,
   if (errorCode != kDNSServiceErr_NoError) {
     return;
   }
+  if (flags != kDNSServiceFlagsAdd) {
+    return;
+  }
 
-  wpi::SmallString<128> fullname;
-  fullname.append(serviceName);
-  fullname.push_back('.');
-  fullname.append(replyDomain);
-  fullname.push_back('\0');
+  DnsFinder* finder = static_cast<DnsFinder*>(context);
+  auto& resolveState = finder->pImpl->ResolveStates.emplace_back(
+      std::make_unique<DnsResolveState>(finder));
 
-  DNSServiceQueryRecord(&static_cast<DnsFinder*>(context)->pImpl->ServiceRef,
-                        flags, interfaceIndex, fullname.c_str(),
-                        kDNSServiceType_A, kDNSServiceClass_IN,
-                        ServiceQueryRecordReply, context);
+  errorCode = DNSServiceResolve(&resolveState->ResolveRef, 0, interfaceIndex,
+                                serviceName, regtype, replyDomain,
+                                ServiceResolveReply, resolveState.get());
+
+  if (errorCode == kDNSServiceErr_NoError) {
+    resolveState->ResolveSocket = DNSServiceRefSockFD(resolveState->ResolveRef);
+  } else {
+    resolveState->Finder->pImpl->ResolveStates.erase(std::find_if(
+        resolveState->Finder->pImpl->ResolveStates.begin(),
+        resolveState->Finder->pImpl->ResolveStates.end(),
+        [r = resolveState.get()](auto& a) { return a.get() == r; }));
+  }
 }
 
 bool DnsFinder::StartSearch() {
@@ -65,6 +162,8 @@ bool DnsFinder::StartSearch() {
   DNSServiceErrorType status = DNSServiceBrowse(
       &pImpl->ServiceRef, 0, 0, "_ni-rt._tcp", "local", DnsCompletion, this);
   if (status == kDNSServiceErr_NoError) {
+    pImpl->ServiceQuerySocket = DNSServiceRefSockFD(pImpl->ServiceRef);
+    pImpl->running = true;
     // DNSServiceSetDispatchQueue(pImpl->ServiceRef, dispatch_get_main_queue());
     pImpl->Thread = std::thread([&] { pImpl->ThreadMain(); });
     return true;
@@ -73,7 +172,7 @@ bool DnsFinder::StartSearch() {
 }
 
 void DnsFinder::StopSearch() {
-  DNSServiceRefDeallocate(pImpl->ServiceRef);
+  pImpl->running = false;
   if (pImpl->Thread.joinable())
     pImpl->Thread.join();
 }

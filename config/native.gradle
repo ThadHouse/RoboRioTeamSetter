@@ -60,7 +60,7 @@ nativeUtils {
     gui(nativeUtils.getNativeDependencyType('AllPlatformsCombinedNativeDependency')) {
       dependencies = [
                       "libglassnt", "libglass", "wpigui", "imgui_static",
-                      "wpimath_static", "ntcore_static", "wpiutil_static"]
+                      "ntcore_static", "wpiutil_static"]
     }
     ssh(nativeUtils.getNativeDependencyType('AllPlatformsCombinedNativeDependency')) {
       dependencies = ["libssh"]
