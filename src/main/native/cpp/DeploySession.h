@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <future>
+#include <optional>
 
 #include <wpi/Logger.h>
 
@@ -43,7 +44,14 @@ class DeploySession {
   /**
    * Executes the deploy. This can be called from any thread.
    */
-  std::future<int> Execute(const std::string& macAddress, int team, unsigned int ipAddress);
+  bool ChangeTeamNumber(const std::string& macAddress, int team, unsigned int ipAddress);
+
+  bool Blink(const std::string& macAddress, unsigned int ipAddress);
+
+  bool Reboot(const std::string& macAddress, unsigned int ipAddress);
+
+  std::future<int>* GetFuture(const std::string& macAddress);
+  void DestroyFuture(const std::string& macAddress);
 
   /**
    * Returns the state of the deploy session.
@@ -51,8 +59,6 @@ class DeploySession {
   Status GetStatus() const;
 
  private:
-  int m_teamNumber;
-  unsigned int m_ipAddress;
 
   // Logger reference where log messages will be sent.
   wpi::Logger& m_logger;
