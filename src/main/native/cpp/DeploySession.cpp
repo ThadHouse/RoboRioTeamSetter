@@ -106,8 +106,8 @@ bool DeploySession::Reboot(const std::string& macAddress,
     return false;
   }
 
-  std::future<int> future = std::async(
-      std::launch::async, [this, ipAddress, mac = macAddress]() {
+  std::future<int> future =
+      std::async(std::launch::async, [this, ipAddress, mac = macAddress]() {
         //  Convert to IP address.
         wpi::SmallString<16> ip;
         in_addr addr;
@@ -149,8 +149,8 @@ bool DeploySession::Blink(const std::string& macAddress,
     return false;
   }
 
-  std::future<int> future = std::async(
-      std::launch::async, [this, ipAddress, mac = macAddress]() {
+  std::future<int> future =
+      std::async(std::launch::async, [this, ipAddress, mac = macAddress]() {
         //  Convert to IP address.
         wpi::SmallString<16> ip;
         in_addr addr;
@@ -166,7 +166,10 @@ bool DeploySession::Blink(const std::string& macAddress,
 
           try {
             session.Execute(fmt::format(
-                "for i in 1 2 3 4 5  ;  do ` echo 255 > /sys/class/leds/nilrt:wifi:primary/brightness; sleep 0.5; echo 0 > /sys/class/leds/nilrt:wifi:primary/brightness; sleep 0.5 ` ; done"));
+                "for i in 1 2 3 4 5  ;  do ` echo 255 > "
+                "/sys/class/leds/nilrt:wifi:primary/brightness; sleep 0.5; "
+                "echo 0 > /sys/class/leds/nilrt:wifi:primary/brightness; sleep "
+                "0.5 ` ; done"));
           } catch (const SshSession::SshException& e) {
             ERROR("An exception occurred: {}", e.what());
             throw e;
