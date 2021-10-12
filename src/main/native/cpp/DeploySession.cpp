@@ -16,6 +16,10 @@
 
 using namespace sysid;
 
+#ifdef ERROR
+#undef ERROR
+#endif
+
 // Macros to make logging easier.
 #define INFO(fmt, ...) WPI_INFO(m_logger, fmt, __VA_ARGS__)
 #define DEBUG(fmt, ...) WPI_DEBUG(m_logger, fmt, __VA_ARGS__)
@@ -71,7 +75,7 @@ void DeploySession::Execute(wpi::uv::Loop& lp) {
         ERROR("An exception occurred: {}", e.what());
       }
     } catch (const SshSession::SshException& e) {
-      DEBUG("SSH connection to {} failed.", ip);
+      DEBUG("SSH connection to {} failed with {}.", ip, e.what());
     }
   });
   wpi::uv::QueueWork(lp, wreq);

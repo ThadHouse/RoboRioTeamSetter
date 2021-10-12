@@ -8,6 +8,13 @@ nativeUtils.addWpiNativeUtils()
 nativeUtils.wpi.addWarnings()
 nativeUtils.wpi.addWarningsAsErrors()
 
+nativeUtils.platformConfigs.each {
+    if (!it.name.contains('windows')) return
+    it.cppCompiler.args.remove("/std:c++17")
+    it.cppCompiler.args.add("/std:c++latest")
+    it.cppCompiler.args.add("/Zc:__cplusplus")
+}
+
 // Configure WPILib, wpimath, and Dear ImGui versions.
 nativeUtils.wpi.configureDependencies {
   wpiVersion = wpilibVersion
