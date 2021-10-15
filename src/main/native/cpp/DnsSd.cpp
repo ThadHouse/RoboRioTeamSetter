@@ -72,31 +72,6 @@ struct DnsFinder::Impl {
 DnsFinder::DnsFinder() : pImpl{std::make_unique<Impl>()} {}
 DnsFinder::~DnsFinder() {}
 
-// static void ServiceQueryRecordReply(DNSServiceRef sdRef, DNSServiceFlags
-// flags,
-//                                     uint32_t interfaceIndex,
-//                                     DNSServiceErrorType errorCode,
-//                                     const char* fullname, uint16_t rrtype,
-//                                     uint16_t rrclass, uint16_t rdlen,
-//                                     const void* rdata, uint32_t ttl,
-//                                     void* context) {
-//   if (rdlen != 4 || rrtype != kDNSServiceType_A) {
-//     return;
-//   }
-
-//   DnsResolveState* resolveState = static_cast<DnsResolveState*>(context);
-//   printf("%s\n", resolveState->MacAddress.c_str());
-//   fflush(stdout);
-
-//   resolveState->Finder->OnFound(*static_cast<const unsigned int*>(rdata),
-//                                 fullname);
-
-//   resolveState->Finder->pImpl->ResolveStates.erase(std::find_if(
-//       resolveState->Finder->pImpl->ResolveStates.begin(),
-//       resolveState->Finder->pImpl->ResolveStates.end(),
-//       [resolveState](auto& a) { return a.get() == resolveState; }));
-// }
-
 void ServiceGetAddrInfoReply(DNSServiceRef sdRef, DNSServiceFlags flags,
                              uint32_t interfaceIndex,
                              DNSServiceErrorType errorCode,
@@ -164,7 +139,7 @@ static void DnsCompletion(DNSServiceRef sdRef, DNSServiceFlags flags,
   if (errorCode != kDNSServiceErr_NoError) {
     return;
   }
-  if (flags != kDNSServiceFlagsAdd) {
+  if (!(flags & kDNSServiceFlagsAdd)) {
     return;
   }
 
