@@ -35,6 +35,8 @@ GLFWAPI void glfwGetWindowSize(GLFWwindow* window, int* width, int* height);
 int teamNumber;
 std::unordered_map<std::string, std::pair<unsigned int, std::string>> foundDevices;
 std::mutex devicesLock;
+wpi::Logger logger;
+sysid::DeploySession deploySession{logger};
 
 static void DisplayGui() {
   ImGui::GetStyle().WindowRounding = 0;
@@ -82,7 +84,7 @@ static void DisplayGui() {
     teamNumber = 0;
   }
 
-  ImGui::Columns(4, "Devices");
+  ImGui::Columns(6, "Devices");
   ImGui::Text("Name");
   ImGui::NextColumn();
   ImGui::Text("MAC Address");
@@ -91,7 +93,12 @@ static void DisplayGui() {
   ImGui::NextColumn();
   ImGui::Text("Set");
   ImGui::NextColumn();
+  ImGui::Text("Blink");
+  ImGui::NextColumn();
+  ImGui::Text("Reboot");
+  ImGui::NextColumn();
   ImGui::Separator();
+  // TODO make columns better
 
   std::string setString = fmt::format("Set team to {}", teamNumber);
 
@@ -106,11 +113,30 @@ static void DisplayGui() {
       in.s_addr = i.second.first;
       ImGui::Text("%s", inet_ntoa(in));
       ImGui::NextColumn();
-      if (ImGui::Button(setString.c_str())) {
-        // TODO
-        printf("Hello\n");
-        fflush(stdout);
+      std::future<int>* future = deploySession.GetFuture(i.first);
+      ImGui::PushID(i.first.c_str());
+      if (future) {
+        ImGui::Button("Deploying");
+        ImGui::NextColumn();
+        ImGui::NextColumn();
+        const auto fs = future->wait_for(std::chrono::seconds(0));
+        if (fs == std::future_status::ready) {
+          deploySession.DestroyFuture(i.first);
+        }
+      } else {
+        if (ImGui::Button(setString.c_str())) {
+          deploySession.ChangeTeamNumber(i.first, teamNumber, i.second.first);
+        }
+        ImGui::NextColumn();
+        if (ImGui::Button("Blink")) {
+          deploySession.Blink(i.first, i.second.first);
+        }
+        ImGui::NextColumn();
+        if (ImGui::Button("Reboot")) {
+          deploySession.Reboot(i.first, i.second.first);
+        }
       }
+      ImGui::PopID();
       ImGui::NextColumn();
     }
   }

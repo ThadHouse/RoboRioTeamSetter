@@ -3,6 +3,7 @@
 #include <memory>
 #include <mutex>
 #include <string_view>
+#include <unordered_set>
 
 #include <fmt/core.h>
 #include <wpi/SmallString.h>
@@ -31,52 +32,155 @@ static constexpr int kPort = 22;
 static constexpr std::string_view kUsername = "admin";
 static constexpr std::string_view kPassword = "";
 
-wpi::mutex s_mutex;
+std::unordered_map<std::string, std::future<int>> s_outstanding;
 
-DeploySession::DeploySession(int team, unsigned int ipAddress,
-                             wpi::Logger& logger)
-    : m_teamNumber{team}, m_ipAddress{ipAddress}, m_logger{logger} {}
+DeploySession::DeploySession(wpi::Logger& logger) : m_logger{logger} {}
 
-void DeploySession::Execute(wpi::uv::Loop& lp) {
-  // Lock mutex.
-  std::scoped_lock lock{s_mutex};
+template <typename T>
+struct SafeDeleter {
+  SafeDeleter(T d) : deleter(d) {}
+  ~SafeDeleter() noexcept { deleter(); }
+  T deleter;
+};
 
-  auto wreq = std::make_shared<wpi::uv::WorkReq>();
+std::future<int>* DeploySession::GetFuture(const std::string& macAddress) {
+  auto itr = s_outstanding.find(macAddress);
+  if (itr == s_outstanding.end()) {
+    return nullptr;
+  }
+  return &itr->second;
+}
 
-  wreq->afterWork.connect([this] { m_visited.fetch_add(1); });
+void DeploySession::DestroyFuture(const std::string& macAddress) {
+  s_outstanding.erase(macAddress);
+}
 
-  wreq->work.connect([this] {
-    // Convert to IP address.
-    wpi::SmallString<16> ip;
-    in_addr addr;
-    addr.s_addr = this->m_ipAddress;
-    wpi::uv::AddrToName(addr, &ip);
-    DEBUG("Trying to establish SSH connection to {}.", ip);
-    try {
-      if (m_connected) {
-        return;
-      }
-      SshSession session{ip.str(), kPort, kUsername, kPassword, m_logger};
-      session.Open();
-      DEBUG("SSH connection to {} was successful.", ip);
+bool DeploySession::ChangeTeamNumber(const std::string& macAddress,
+                                     int teamNumber, unsigned int ipAddress) {
+  auto itr = s_outstanding.find(macAddress);
+  if (itr != s_outstanding.end()) {
+    return false;
+  }
 
-      // If we were successful, continue with the deploy (after
-      // making sure that no other thread also reached this location
-      // at the same time).
-      if (m_connected.exchange(true)) {
-        return;
-      }
+  std::future<int> future = std::async(
+      std::launch::async, [this, ipAddress, teamNumber, mac = macAddress]() {
+        //  Convert to IP address.
+        wpi::SmallString<16> ip;
+        in_addr addr;
+        addr.s_addr = ipAddress;
+        wpi::uv::AddrToName(addr, &ip);
+        DEBUG("Trying to establish SSH connection to {}.", ip);
+        try {
+          SshSession session{ip.str(), kPort, kUsername, kPassword, m_logger};
+          session.Open();
+          DEBUG("SSH connection to {} was successful.", ip);
 
-      SUCCESS("{}", "roboRIO Connected!");
+          SUCCESS("{}", "roboRIO Connected!");
 
-      try {
-        session.Execute(fmt::format("/usr/local/natinst/bin/nirtcfg --file=/etc/natinst/share/ni-rt.ini --set section=systemsettings,token=host_name,value=roborio-{}-FRC ; sync", m_teamNumber));
-      } catch (const SshSession::SshException& e) {
-        ERROR("An exception occurred: {}", e.what());
-      }
-    } catch (const SshSession::SshException& e) {
-      DEBUG("SSH connection to {} failed with {}.", ip, e.what());
-    }
-  });
-  wpi::uv::QueueWork(lp, wreq);
+          try {
+            session.Execute(fmt::format(
+                "/usr/local/natinst/bin/nirtcfg "
+                "--file=/etc/natinst/share/ni-rt.ini --set "
+                "section=systemsettings,token=host_name,value=roborio-{"
+                "}-FRC ; sync",
+                teamNumber));
+          } catch (const SshSession::SshException& e) {
+            ERROR("An exception occurred: {}", e.what());
+            throw e;
+          }
+        } catch (const SshSession::SshException& e) {
+          DEBUG("SSH connection to {} failed with {}.", ip, e.what());
+          throw e;
+        }
+        return 0;
+      });
+
+  s_outstanding[macAddress] = std::move(future);
+  return true;
+}
+
+bool DeploySession::Reboot(const std::string& macAddress,
+                           unsigned int ipAddress) {
+  auto itr = s_outstanding.find(macAddress);
+  if (itr != s_outstanding.end()) {
+    return false;
+  }
+
+  std::future<int> future =
+      std::async(std::launch::async, [this, ipAddress, mac = macAddress]() {
+        //  Convert to IP address.
+        wpi::SmallString<16> ip;
+        in_addr addr;
+        addr.s_addr = ipAddress;
+        wpi::uv::AddrToName(addr, &ip);
+        DEBUG("Trying to establish SSH connection to {}.", ip);
+        try {
+          SshSession session{ip.str(), kPort, kUsername, kPassword, m_logger};
+          session.Open();
+          DEBUG("SSH connection to {} was successful.", ip);
+
+          SUCCESS("{}", "roboRIO Connected!");
+
+          try {
+            // session.Execute(fmt::format(
+            //     "/usr/local/natinst/bin/nirtcfg "
+            //     "--file=/etc/natinst/share/ni-rt.ini --set "
+            //     "section=systemsettings,token=host_name,value=roborio-{"
+            //     "}-FRC ; sync"));
+          } catch (const SshSession::SshException& e) {
+            ERROR("An exception occurred: {}", e.what());
+            throw e;
+          }
+        } catch (const SshSession::SshException& e) {
+          DEBUG("SSH connection to {} failed with {}.", ip, e.what());
+          throw e;
+        }
+        return 0;
+      });
+
+  s_outstanding[macAddress] = std::move(future);
+  return true;
+}
+
+bool DeploySession::Blink(const std::string& macAddress,
+                          unsigned int ipAddress) {
+  auto itr = s_outstanding.find(macAddress);
+  if (itr != s_outstanding.end()) {
+    return false;
+  }
+
+  std::future<int> future =
+      std::async(std::launch::async, [this, ipAddress, mac = macAddress]() {
+        //  Convert to IP address.
+        wpi::SmallString<16> ip;
+        in_addr addr;
+        addr.s_addr = ipAddress;
+        wpi::uv::AddrToName(addr, &ip);
+        DEBUG("Trying to establish SSH connection to {}.", ip);
+        try {
+          SshSession session{ip.str(), kPort, kUsername, kPassword, m_logger};
+          session.Open();
+          DEBUG("SSH connection to {} was successful.", ip);
+
+          SUCCESS("{}", "roboRIO Connected!");
+
+          try {
+            session.Execute(fmt::format(
+                "for i in 1 2 3 4 5  ;  do ` echo 255 > "
+                "/sys/class/leds/nilrt:wifi:primary/brightness; sleep 0.5; "
+                "echo 0 > /sys/class/leds/nilrt:wifi:primary/brightness; sleep "
+                "0.5 ` ; done"));
+          } catch (const SshSession::SshException& e) {
+            ERROR("An exception occurred: {}", e.what());
+            throw e;
+          }
+        } catch (const SshSession::SshException& e) {
+          DEBUG("SSH connection to {} failed with {}.", ip, e.what());
+          throw e;
+        }
+        return 0;
+      });
+
+  s_outstanding[macAddress] = std::move(future);
+  return true;
 }

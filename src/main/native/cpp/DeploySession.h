@@ -8,10 +8,10 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <future>
+#include <optional>
 
 #include <wpi/Logger.h>
-#include <wpi/json.h>
-#include <wpi/uv/Loop.h>
 
 namespace sysid {
 // Define an integer for a successful message in the log (shown in green on the
@@ -39,15 +39,19 @@ class DeploySession {
    * @param config The generation configuration file to be sent to the roboRIO.
    * @param logger A reference to a logger where log messages should be sent.
    */
-  DeploySession(int team, unsigned int ipAddress,
-                wpi::Logger& logger);
+  DeploySession(wpi::Logger& logger);
 
   /**
    * Executes the deploy. This can be called from any thread.
-   *
-   * @param lp A reference to a libuv event loop to run the deploy on.
    */
-  void Execute(wpi::uv::Loop& lp);
+  bool ChangeTeamNumber(const std::string& macAddress, int team, unsigned int ipAddress);
+
+  bool Blink(const std::string& macAddress, unsigned int ipAddress);
+
+  bool Reboot(const std::string& macAddress, unsigned int ipAddress);
+
+  std::future<int>* GetFuture(const std::string& macAddress);
+  void DestroyFuture(const std::string& macAddress);
 
   /**
    * Returns the state of the deploy session.
@@ -55,15 +59,9 @@ class DeploySession {
   Status GetStatus() const;
 
  private:
-  int m_teamNumber;
-  unsigned int m_ipAddress;
 
   // Logger reference where log messages will be sent.
   wpi::Logger& m_logger;
-
-  // Whether we have an active SSH connection to the roboRIO and deploying
-  // artifacts.
-  std::atomic_bool m_connected = false;
 
   // The number of hostnames that have completed their resolution/connection
   // attempts.

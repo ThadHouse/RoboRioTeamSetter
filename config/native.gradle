@@ -26,7 +26,7 @@ nativeUtils.wpi.configureDependencies {
 // Configure wpigui, libglass, libglassnt.
 nativeUtils {
   nativeDependencyContainer {
-    wpigui(nativeUtils.getNativeDependencyType('WPIStaticMavenDependency')) {
+    wpigui(getNativeDependencyTypeClass('WPIStaticMavenDependency')) {
       groupId = "edu.wpi.first.wpigui"
       artifactId = "wpigui-cpp"
       headerClassifier = "headers"
@@ -35,7 +35,7 @@ nativeUtils {
       version = wpilibVersion
       targetPlatforms.addAll(nativeUtils.wpi.platforms.desktopPlatforms)
     }
-    libglass(nativeUtils.getNativeDependencyType('WPIStaticMavenDependency')) {
+    libglass(getNativeDependencyTypeClass('WPIStaticMavenDependency')) {
       groupId = "edu.wpi.first.glass"
       artifactId = "libglass"
       headerClassifier = "headers"
@@ -44,7 +44,7 @@ nativeUtils {
       version = wpilibVersion
       targetPlatforms.addAll(nativeUtils.wpi.platforms.desktopPlatforms)
     }
-    libglassnt(nativeUtils.getNativeDependencyType('WPIStaticMavenDependency')) {
+    libglassnt(getNativeDependencyTypeClass('WPIStaticMavenDependency')) {
       groupId = "edu.wpi.first.glass"
       artifactId = "libglassnt"
       headerClassifier = "headers"
@@ -53,7 +53,7 @@ nativeUtils {
       version = wpilibVersion
       targetPlatforms.addAll(nativeUtils.wpi.platforms.desktopPlatforms)
     }
-    libssh(nativeUtils.getNativeDependencyType('WPIStaticMavenDependency')) {
+    libssh(getNativeDependencyTypeClass('WPIStaticMavenDependency')) {
       groupId = "edu.wpi.first.thirdparty.frc2022"
       artifactId = "libssh"
       headerClassifier = "headers"
@@ -64,12 +64,12 @@ nativeUtils {
     }
 
     // Combined
-    gui(nativeUtils.getNativeDependencyType('AllPlatformsCombinedNativeDependency')) {
+    gui(getNativeDependencyTypeClass('AllPlatformsCombinedNativeDependency')) {
       dependencies = [
                       "libglassnt", "libglass", "wpigui", "imgui_static",
                       "ntcore_static", "wpiutil_static"]
     }
-    ssh(nativeUtils.getNativeDependencyType('AllPlatformsCombinedNativeDependency')) {
+    ssh(getNativeDependencyTypeClass('AllPlatformsCombinedNativeDependency')) {
       dependencies = ["libssh"]
     }
   }
