@@ -19,11 +19,11 @@
 #include <wpi/Logger.h>
 #include <wpi/fs.h>
 #include <wpigui.h>
-#include "DnsFinder.h"
 #include <unordered_map>
 #include <mutex>
 #include "wpi/SmallString.h"
 #include "DeploySession.h"
+#include "wpi/MulticastServiceResolver.h"
 
 namespace gui = wpi::gui;
 
@@ -32,13 +32,34 @@ const char* GetWPILibVersion();
 #define GLFWAPI extern "C"
 GLFWAPI void glfwGetWindowSize(GLFWwindow* window, int* width, int* height);
 
-int teamNumber;
-std::unordered_map<std::string, std::pair<unsigned int, std::string>> foundDevices;
-std::mutex devicesLock;
-wpi::Logger logger;
-sysid::DeploySession deploySession{logger};
+static int teamNumber;
+static std::unordered_map<std::string, std::pair<unsigned int, std::string>> foundDevices;
+static std::mutex devicesLock;
+static wpi::Logger logger;
+static sysid::DeploySession deploySession{logger};
+static std::unique_ptr<wpi::MulticastServiceResolver> multicastResolver;
+
+static void FindDevices() {
+  WPI_EventHandle resolveEvent = multicastResolver->GetEventHandle();
+
+  int count = 0;
+  bool timedOut = 0;
+  while (count < 10 && wpi::WaitForObject(resolveEvent, 0, &timedOut)) {
+    count++;
+    auto data = multicastResolver->GetData();
+    // search for MAC
+    auto macKey = std::find_if(data.txt.begin(), data.txt.end(), [](const auto& a){return a.first == "MAC";});
+    if (macKey != data.txt.end()) {
+      auto& mac = macKey->second;
+      foundDevices[mac] = std::make_pair(data.ipv4Address, data.hostName);
+    }
+  }
+}
+
 
 static void DisplayGui() {
+  FindDevices();
+
   ImGui::GetStyle().WindowRounding = 0;
 
   // fill entire OS window with this window
@@ -103,7 +124,6 @@ static void DisplayGui() {
   std::string setString = fmt::format("Set team to {}", teamNumber);
 
   {
-    std::scoped_lock lock{devicesLock};
     for (auto&& i : foundDevices) {
       ImGui::Text("%s", i.second.second.c_str());
       ImGui::NextColumn();
@@ -144,10 +164,7 @@ static void DisplayGui() {
   ImGui::End();
 }
 
-void OnDnsFound(const std::string& macAddress, unsigned int ipAddress, std::string_view name) {
-  std::scoped_lock lock{devicesLock};
-  foundDevices[macAddress] = std::make_pair(ipAddress, std::string(name));
-}
+
 
 void Application() {
   gui::CreateContext();
@@ -155,10 +172,8 @@ void Application() {
 
   ssh_init();
 
-  DnsFinder DnsResolver;
-
-  DnsResolver.SetOnFound(OnDnsFound);
-  DnsResolver.StartSearch();
+  multicastResolver = std::make_unique<wpi::MulticastServiceResolver>("_ni._tcp");
+  multicastResolver->Start();
 
   gui::ConfigurePlatformSaveFile("teamnumbersetter.ini");
 
@@ -166,8 +181,8 @@ void Application() {
   gui::Initialize("roboRIO Team Number Setter", 600, 400);
 
   gui::Main();
-
-  DnsResolver.StopSearch();
+  multicastResolver->Stop();
+  multicastResolver = nullptr;
 
   glass::DestroyContext();
   gui::DestroyContext();
