@@ -73,20 +73,6 @@ nativeUtils {
       dependencies = ["libssh"]
     }
   }
-  // combinedDependencyConfigs {
-  //   gui {
-  //     libraryName = "gui"
-  //     targetPlatforms.addAll(nativeUtils.wpi.platforms.desktopPlatforms)
-  //     dependencies <<
-  //         "wpimath_static" << "ntcore_static" << "wpiutil_static" <<
-  //         "libglassnt_static" << "libglass_static" << "wpigui_static" << "imgui_static"
-  //   }
-  //   ssh {
-  //     libraryName = "ssh"
-  //     targetPlatforms.addAll(nativeUtils.wpi.platforms.desktopPlatforms)
-  //     dependencies << "libssh_static"
-  //   }
-  // }
 }
 
 // Enable builds for all platforms.

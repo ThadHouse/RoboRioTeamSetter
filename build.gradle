@@ -3,7 +3,6 @@ import edu.wpi.first.nativeutils.dependencies.WPIStaticMavenDependency;
 
 plugins {
   id "base"
-  id "edu.wpi.first.GradleVsCode" version "0.12.0"
   id "edu.wpi.first.wpilib.versioning.WPILibVersioningPlugin" version "4.1.0"
   id "edu.wpi.first.wpilib.repositories.WPILibRepositoriesPlugin" version "2020.2"
   id "cpp"
