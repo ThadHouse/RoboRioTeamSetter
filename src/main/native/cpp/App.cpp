@@ -106,6 +106,9 @@ static void DisplayGui() {
     ImGui::Separator();
     ImGui::Text("v%s", GetWPILibVersion());
     ImGui::Separator();
+    ImGui::Text("Has mDNS Access: %d",
+                static_cast<int>(multicastResolver->HasImplementation()));
+    ImGui::Separator();
     ImGui::Text("Save location: %s", glass::GetStorageDir().c_str());
     if (ImGui::Button("Close")) {
       ImGui::CloseCurrentPopup();
@@ -188,7 +191,8 @@ void Application(std::string_view saveDir) {
 
   ssh_init();
 
-  teamNumberRef = std::make_unique<TeamNumberRefHolder>(glass::GetStorageRoot());
+  teamNumberRef =
+      std::make_unique<TeamNumberRefHolder>(glass::GetStorageRoot());
 
   multicastResolver =
       std::make_unique<wpi::MulticastServiceResolver>("_ni._tcp");
