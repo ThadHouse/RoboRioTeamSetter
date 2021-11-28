@@ -18,7 +18,7 @@ wpilibVersioning.useAllTags = true
 
 // Configure what repositories we should get dependencies from.
 allprojects {
-  wpilibRepositories.addAllReleaseRepositories(it)
+  wpilibRepositories.addAllDevelopmentRepositories(it)
 }
 
 // Finalize the versioning for this project.

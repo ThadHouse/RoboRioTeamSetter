@@ -74,7 +74,7 @@ static void FindDevices() {
   }
 }
 
-static int minWidth = 600;
+static int minWidth = 400;
 
 static void DisplayGui() {
   int& teamNumber = teamNumberRef->teamNumber;
@@ -84,8 +84,6 @@ static void DisplayGui() {
 
   // fill entire OS window with this window
   ImGui::SetNextWindowPos(ImVec2(0, 0));
-  glfwSetWindowSizeLimits(gui::GetSystemWindow(), minWidth, 200, GLFW_DONT_CARE,
-                          GLFW_DONT_CARE);
   int width, height;
   glfwGetWindowSize(gui::GetSystemWindow(), &width, &height);
 
@@ -232,6 +230,13 @@ static void DisplayGui() {
   }
   ImGui::Columns();
   ImGui::End();
+
+  glfwSetWindowSizeLimits(gui::GetSystemWindow(), minWidth, 200, GLFW_DONT_CARE,
+                           GLFW_DONT_CARE);
+  if (width < minWidth) {
+    width = minWidth;
+    glfwSetWindowSize(gui::GetSystemWindow(), width, height);
+  }
 }
 
 void Application(std::string_view saveDir) {
