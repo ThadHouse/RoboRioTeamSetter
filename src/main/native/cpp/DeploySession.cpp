@@ -122,11 +122,8 @@ bool DeploySession::Reboot(const std::string& macAddress,
           SUCCESS("{}", "roboRIO Connected!");
 
           try {
-            // session.Execute(fmt::format(
-            //     "/usr/local/natinst/bin/nirtcfg "
-            //     "--file=/etc/natinst/share/ni-rt.ini --set "
-            //     "section=systemsettings,token=host_name,value=roborio-{"
-            //     "}-FRC ; sync"));
+            session.Execute(fmt::format(
+                "sync ; shutdown -r now"));
           } catch (const SshSession::SshException& e) {
             ERROR("An exception occurred: {}", e.what());
             throw e;
