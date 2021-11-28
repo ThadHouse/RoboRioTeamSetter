@@ -1,22 +1,22 @@
 // Define our artifact IDs, classifiers, etc. for publishing.
-def baseArtifactId = "SysId"
+def baseArtifactId = "roboRIOTeamSetter"
 def artifactGroupId = "edu.wpi.first.tools"
-def zipBaseName = "_GROUP_edu_wpi_first_tools_ID_SysId_CLS"
+def zipBaseName = "_GROUP_edu_wpi_first_tools_ID_roboRIOTeamSetter_CLS"
 
 model {
   publishing {
     Task zip
-    $.components.sysid.binaries.each { binary ->
+    $.components.roborioteamsetter.binaries.each { binary ->
       if (binary.buildable && binary.name.contains("release")) {
         // Get path to exe.
         def exe = binary.executable.getFile()
-        def icon = file("$project.projectDir/src/main/native/mac/sysid.icns")
+        def icon = file("$project.projectDir/src/main/native/mac/roborioteamsetter.icns")
 
         // Create an application bundle on macOS and set that as the exe.
         def bundle = project.tasks.create("bundle", Copy) {
-          description("Generates a macOS application bundle for SysId")
+          description("Generates a macOS application bundle for roboRIOTeamSetter")
           from(file("$project.projectDir/Info.plist"))
-          into(file("$project.buildDir/outputs/bundles/SysId.app/Contents"))
+          into(file("$project.buildDir/outputs/bundles/roboRIOTeamSetter.app/Contents"))
           into("MacOS") { with copySpec { from binary.executable.file } }
           into("Resources") { with copySpec { from icon } }
         }

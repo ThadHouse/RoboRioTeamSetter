@@ -22,9 +22,10 @@ allprojects {
 }
 
 // Finalize the versioning for this project.
-if (project.hasProperty("publishVersion")) {
-  wpilibVersioning.version.set(project.publishVersion)
-}
+// if (project.hasProperty("publishVersion")) {
+//   wpilibVersioning.version.set(project.publishVersion)
+// }
+wpilibVersioning.version.set("0.0.1")
 wpilibVersioning.version.finalizeValue()
 
 // Configure output files.
@@ -114,7 +115,7 @@ tasks.withType(CppCompile) {
 // Configure application.
 model {
   components {
-    roboRioTeamSetter(NativeExecutableSpec) {
+    roborioteamsetter(NativeExecutableSpec) {
       sources.cpp {
         source {
           srcDirs "src/main/native/cpp", "$buildDir/generated/main/cpp"
@@ -122,14 +123,14 @@ model {
         }
         exportedHeaders.srcDirs "src/main/native/include"
       }
-      // if (OperatingSystem.current().isWindows()) {
-      //   sources.rc {
-      //     source {
-      //       srcDirs "src/main/native/win"
-      //       include "*.rc"
-      //     }
-      //   }
-      // }
+      if (OperatingSystem.current().isWindows()) {
+        sources.rc {
+          source {
+            srcDirs "src/main/native/win"
+            include "*.rc"
+          }
+        }
+      }
     }
   }
   binaries {
@@ -159,7 +160,7 @@ model {
   }
   tasks {
     // Create the run task.
-    $.components.roboRioTeamSetter.binaries.each { bin ->
+    $.components.roborioteamsetter.binaries.each { bin ->
       if (bin.buildable && bin.name.contains("debug")) {
         Task run = project.tasks.create("run", Exec) {
           commandLine bin.tasks.install.runScriptFile.get().asFile.toString()
@@ -169,6 +170,9 @@ model {
     }
   }
 }
+
+// Configure publishing.
+apply from: "config/publish.gradle"
 
 wrapper {
     gradleVersion = '7.2'
