@@ -106,7 +106,7 @@ static void DisplayGui() {
     ImGui::Separator();
     ImGui::Text("v%s", GetWPILibVersion());
     ImGui::Separator();
-    ImGui::Text("Has mDNS Access: %d",
+    ImGui::Text("Has mDNS Implementation: %d",
                 static_cast<int>(multicastResolver->HasImplementation()));
     ImGui::Separator();
     ImGui::Text("Save location: %s", glass::GetStorageDir().c_str());
@@ -116,66 +116,77 @@ static void DisplayGui() {
     ImGui::EndPopup();
   }
 
-  ImGui::InputInt("Team Number", &teamNumber);
+  if (multicastResolver->HasImplementation()) {
+    ImGui::InputInt("Team Number", &teamNumber);
 
-  if (teamNumber < 0) {
-    teamNumber = 0;
-  }
-
-  ImGui::Columns(6, "Devices");
-  ImGui::Text("Name");
-  ImGui::NextColumn();
-  ImGui::Text("MAC Address");
-  ImGui::NextColumn();
-  ImGui::Text("IP Address");
-  ImGui::NextColumn();
-  ImGui::Text("Set");
-  ImGui::NextColumn();
-  ImGui::Text("Blink");
-  ImGui::NextColumn();
-  ImGui::Text("Reboot");
-  ImGui::NextColumn();
-  ImGui::Separator();
-  // TODO make columns better
-
-  std::string setString = fmt::format("Set team to {}", teamNumber);
-
-  {
-    for (auto&& i : foundDevices) {
-      ImGui::Text("%s", i.second.second.c_str());
-      ImGui::NextColumn();
-      ImGui::Text("%s", i.first.c_str());
-      ImGui::NextColumn();
-      struct in_addr in;
-      in.s_addr = i.second.first;
-      ImGui::Text("%s", inet_ntoa(in));
-      ImGui::NextColumn();
-      std::future<int>* future = deploySession.GetFuture(i.first);
-      ImGui::PushID(i.first.c_str());
-      if (future) {
-        ImGui::Button("Deploying");
-        ImGui::NextColumn();
-        ImGui::NextColumn();
-        const auto fs = future->wait_for(std::chrono::seconds(0));
-        if (fs == std::future_status::ready) {
-          deploySession.DestroyFuture(i.first);
-        }
-      } else {
-        if (ImGui::Button(setString.c_str())) {
-          deploySession.ChangeTeamNumber(i.first, teamNumber, i.second.first);
-        }
-        ImGui::NextColumn();
-        if (ImGui::Button("Blink")) {
-          deploySession.Blink(i.first, i.second.first);
-        }
-        ImGui::NextColumn();
-        if (ImGui::Button("Reboot")) {
-          deploySession.Reboot(i.first, i.second.first);
-        }
-      }
-      ImGui::PopID();
-      ImGui::NextColumn();
+    if (teamNumber < 0) {
+      teamNumber = 0;
     }
+
+    ImGui::Columns(6, "Devices");
+    ImGui::Text("Name");
+    ImGui::NextColumn();
+    ImGui::Text("MAC Address");
+    ImGui::NextColumn();
+    ImGui::Text("IP Address");
+    ImGui::NextColumn();
+    ImGui::Text("Set");
+    ImGui::NextColumn();
+    ImGui::Text("Blink");
+    ImGui::NextColumn();
+    ImGui::Text("Reboot");
+    ImGui::NextColumn();
+    ImGui::Separator();
+    // TODO make columns better
+
+    std::string setString = fmt::format("Set team to {}", teamNumber);
+
+    {
+      for (auto&& i : foundDevices) {
+        ImGui::Text("%s", i.second.second.c_str());
+        ImGui::NextColumn();
+        ImGui::Text("%s", i.first.c_str());
+        ImGui::NextColumn();
+        struct in_addr in;
+        in.s_addr = i.second.first;
+        ImGui::Text("%s", inet_ntoa(in));
+        ImGui::NextColumn();
+        std::future<int>* future = deploySession.GetFuture(i.first);
+        ImGui::PushID(i.first.c_str());
+        if (future) {
+          ImGui::Button("Deploying");
+          ImGui::NextColumn();
+          ImGui::NextColumn();
+          const auto fs = future->wait_for(std::chrono::seconds(0));
+          if (fs == std::future_status::ready) {
+            deploySession.DestroyFuture(i.first);
+          }
+        } else {
+          if (ImGui::Button(setString.c_str())) {
+            deploySession.ChangeTeamNumber(i.first, teamNumber, i.second.first);
+          }
+          ImGui::NextColumn();
+          if (ImGui::Button("Blink")) {
+            deploySession.Blink(i.first, i.second.first);
+          }
+          ImGui::NextColumn();
+          if (ImGui::Button("Reboot")) {
+            deploySession.Reboot(i.first, i.second.first);
+          }
+        }
+        ImGui::PopID();
+        ImGui::NextColumn();
+      }
+    }
+  } else {
+    // Missing MDNS Implementation
+    ImGui::Text("mDNS Implementation is missing.");
+#ifdef _WIN32
+    ImGui::Text("Windows 10 1809 or newer is required for this tool");;
+#else
+    ImGui::Text("avahi-client 3 and avahi-core 3 are required for this tool");
+    ImGui::Text("Install libavahi-client3 and libavahi-core3 from your package manager");
+#endif
   }
   ImGui::Columns();
   ImGui::End();
