@@ -10,7 +10,9 @@
 #endif
 
 #include <fmt/format.h>
+#include <glass/MainMenuBar.h>
 #include <glass/Context.h>
+#include <glass/Storage.h>
 #include <glass/Window.h>
 #include <glass/WindowManager.h>
 #include <glass/other/Log.h>
@@ -32,12 +34,20 @@ const char* GetWPILibVersion();
 #define GLFWAPI extern "C"
 GLFWAPI void glfwGetWindowSize(GLFWwindow* window, int* width, int* height);
 
-static int teamNumber;
-static std::unordered_map<std::string, std::pair<unsigned int, std::string>> foundDevices;
+struct TeamNumberRefHolder {
+  TeamNumberRefHolder(glass::Storage& storage)
+      : teamNumber{storage.GetInt("TeamNumber", 0)} {}
+  int& teamNumber;
+};
+
+static std::unique_ptr<TeamNumberRefHolder> teamNumberRef;
+static std::unordered_map<std::string, std::pair<unsigned int, std::string>>
+    foundDevices;
 static std::mutex devicesLock;
 static wpi::Logger logger;
 static sysid::DeploySession deploySession{logger};
 static std::unique_ptr<wpi::MulticastServiceResolver> multicastResolver;
+static glass::MainMenuBar gMainMenu;
 
 static void FindDevices() {
   WPI_EventHandle resolveEvent = multicastResolver->GetEventHandle();
@@ -48,7 +58,8 @@ static void FindDevices() {
     count++;
     auto data = multicastResolver->GetData();
     // search for MAC
-    auto macKey = std::find_if(data.txt.begin(), data.txt.end(), [](const auto& a){return a.first == "MAC";});
+    auto macKey = std::find_if(data.txt.begin(), data.txt.end(),
+                               [](const auto& a) { return a.first == "MAC"; });
     if (macKey != data.txt.end()) {
       auto& mac = macKey->second;
       foundDevices[mac] = std::make_pair(data.ipv4Address, data.hostName);
@@ -56,8 +67,8 @@ static void FindDevices() {
   }
 }
 
-
 static void DisplayGui() {
+  int& teamNumber = teamNumberRef->teamNumber;
   FindDevices();
 
   ImGui::GetStyle().WindowRounding = 0;
@@ -74,6 +85,7 @@ static void DisplayGui() {
                    ImGuiWindowFlags_NoCollapse);
 
   ImGui::BeginMenuBar();
+  gMainMenu.WorkspaceMenu();
   gui::EmitViewMenu();
 
   bool about = false;
@@ -93,6 +105,8 @@ static void DisplayGui() {
     ImGui::Text("roboRIO Team Number Setter");
     ImGui::Separator();
     ImGui::Text("v%s", GetWPILibVersion());
+    ImGui::Separator();
+    ImGui::Text("Save location: %s", glass::GetStorageDir().c_str());
     if (ImGui::Button("Close")) {
       ImGui::CloseCurrentPopup();
     }
@@ -164,18 +178,21 @@ static void DisplayGui() {
   ImGui::End();
 }
 
-
-
-void Application() {
+void Application(std::string_view saveDir) {
   gui::CreateContext();
   glass::CreateContext();
 
+  glass::SetStorageName("roborioteamsetter");
+  glass::SetStorageDir(saveDir.empty() ? gui::GetPlatformSaveFileDir()
+                                       : saveDir);
+
   ssh_init();
 
-  multicastResolver = std::make_unique<wpi::MulticastServiceResolver>("_ni._tcp");
-  multicastResolver->Start();
+  teamNumberRef = std::make_unique<TeamNumberRefHolder>(glass::GetStorageRoot());
 
-  gui::ConfigurePlatformSaveFile("teamnumbersetter.ini");
+  multicastResolver =
+      std::make_unique<wpi::MulticastServiceResolver>("_ni._tcp");
+  multicastResolver->Start();
 
   gui::AddLateExecute(DisplayGui);
   gui::Initialize("roboRIO Team Number Setter", 600, 400);
