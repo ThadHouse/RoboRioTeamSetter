@@ -33,6 +33,11 @@ const char* GetWPILibVersion();
 
 #define GLFWAPI extern "C"
 GLFWAPI void glfwGetWindowSize(GLFWwindow* window, int* width, int* height);
+#define GLFW_DONT_CARE -1
+GLFWAPI void glfwSetWindowSizeLimits(GLFWwindow* window, int minwidth,
+                                     int minheight, int maxwidth,
+                                     int maxheight);
+GLFWAPI void glfwSetWindowSize(GLFWwindow* window, int width, int height);
 
 struct TeamNumberRefHolder {
   TeamNumberRefHolder(glass::Storage& storage)
@@ -69,6 +74,8 @@ static void FindDevices() {
   }
 }
 
+static int minWidth = 600;
+
 static void DisplayGui() {
   int& teamNumber = teamNumberRef->teamNumber;
   FindDevices();
@@ -77,8 +84,11 @@ static void DisplayGui() {
 
   // fill entire OS window with this window
   ImGui::SetNextWindowPos(ImVec2(0, 0));
+  glfwSetWindowSizeLimits(gui::GetSystemWindow(), minWidth, 200, GLFW_DONT_CARE,
+                          GLFW_DONT_CARE);
   int width, height;
   glfwGetWindowSize(gui::GetSystemWindow(), &width, &height);
+
   ImGui::SetNextWindowSize(ImVec2(width, height));
 
   ImGui::Begin("Entries", nullptr,
@@ -125,40 +135,62 @@ static void DisplayGui() {
       teamNumber = 0;
     }
 
-    ImGui::Columns(6, "Devices");
-    ImGui::Text("Name");
-    ImGui::NextColumn();
-    ImGui::Text("MAC Address");
-    ImGui::NextColumn();
-    ImGui::Text("IP Address");
-    ImGui::NextColumn();
-    ImGui::Text("Set");
-    ImGui::NextColumn();
-    ImGui::Text("Blink");
-    ImGui::NextColumn();
-    ImGui::Text("Reboot");
-    ImGui::NextColumn();
-    ImGui::Separator();
-    // TODO make columns better
+    int nameWidth = ImGui::CalcTextSize("roboRIO2-0000-FRC.local. ").x;
+    int macWidth = ImGui::CalcTextSize("88:88:88:88:88:88").x;
+    int ipAddressWidth = ImGui::CalcTextSize("255.255.255.255").x;
+    int setWidth = ImGui::CalcTextSize(" Set Team To 99999 ").x;
+    int blinkWidth = ImGui::CalcTextSize(" Blink ").x;
+    int rebootWidth = ImGui::CalcTextSize(" Reboot ").x;
+
+    minWidth = nameWidth + macWidth + ipAddressWidth + setWidth + blinkWidth +
+               rebootWidth + 100;
 
     std::string setString = fmt::format("Set team to {}", teamNumber);
 
-    {
+    if (ImGui::BeginTable("Table", 6)) {
+      ImGui::TableSetupColumn(
+          "Name",
+          ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed,
+          nameWidth);
+      ImGui::TableSetupColumn(
+          "MAC Address",
+          ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed,
+          macWidth);
+      ImGui::TableSetupColumn(
+          "IP Address",
+          ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed,
+          ipAddressWidth);
+      ImGui::TableSetupColumn(
+          "Set",
+          ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed,
+          setWidth);
+      ImGui::TableSetupColumn(
+          "Blink",
+          ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed,
+          blinkWidth);
+      ImGui::TableSetupColumn(
+          "Reboot",
+          ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed,
+          rebootWidth);
+      ImGui::TableHeadersRow();
+
       for (auto&& i : foundDevices) {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
         ImGui::Text("%s", i.second.second.c_str());
-        ImGui::NextColumn();
+        ImGui::TableNextColumn();
         ImGui::Text("%s", i.first.c_str());
-        ImGui::NextColumn();
+        ImGui::TableNextColumn();
         struct in_addr in;
         in.s_addr = i.second.first;
         ImGui::Text("%s", inet_ntoa(in));
-        ImGui::NextColumn();
+        ImGui::TableNextColumn();
         std::future<int>* future = deploySession.GetFuture(i.first);
         ImGui::PushID(i.first.c_str());
         if (future) {
           ImGui::Button("Deploying");
-          ImGui::NextColumn();
-          ImGui::NextColumn();
+          ImGui::TableNextColumn();
+          ImGui::TableNextColumn();
           const auto fs = future->wait_for(std::chrono::seconds(0));
           if (fs == std::future_status::ready) {
             deploySession.DestroyFuture(i.first);
@@ -167,19 +199,24 @@ static void DisplayGui() {
           if (ImGui::Button(setString.c_str())) {
             deploySession.ChangeTeamNumber(i.first, teamNumber, i.second.first);
           }
-          ImGui::NextColumn();
+          ImGui::TableNextColumn();
           if (ImGui::Button("Blink")) {
             deploySession.Blink(i.first, i.second.first);
           }
-          ImGui::NextColumn();
+          ImGui::TableNextColumn();
           if (ImGui::Button("Reboot")) {
             deploySession.Reboot(i.first, i.second.first);
           }
         }
         ImGui::PopID();
-        ImGui::NextColumn();
       }
+
+      ImGui::EndTable();
     }
+
+    ImGui::Columns(6, "Devices");
+
+    // TODO make columns better
   } else {
     // Missing MDNS Implementation
     ImGui::Text("mDNS Implementation is missing.");
