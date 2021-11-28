@@ -35,9 +35,6 @@ jobs:
           java-version: 11
           architecture: ${{ matrix.architecture }}
 
-      - name: Install Toolchain
-        run: ./gradlew installRoborioToolchain
-
       - name: Build with Gradle
         run: ./gradlew build -PbuildServer ${{ matrix.build-options }}
         if: ${{ github.repository_owner != 'wpilibsuite' || !startsWith(github.ref, 'refs/tags/v') }}
@@ -63,9 +60,6 @@ jobs:
       - uses: actions/setup-java@v1
         with:
           java-version: 11
-
-      - name: Install Toolchain
-        run: ./gradlew installRoborioToolchain
 
       - name: Build with Gradle
         run: ./gradlew build -PbuildServer
