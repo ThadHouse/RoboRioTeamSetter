@@ -18,11 +18,7 @@ wpilibVersioning.useAllTags = true
 
 // Configure what repositories we should get dependencies from.
 allprojects {
-  if (project.hasProperty("releaseMode")) {
-    wpilibRepositories.addAllReleaseRepositories(it)
-  } else {
-    wpilibRepositories.addAllDevelopmentRepositories(it)
-  }
+  wpilibRepositories.addAllReleaseRepositories(it)
 }
 
 // Finalize the versioning for this project.

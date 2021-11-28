@@ -52,17 +52,19 @@ static glass::MainMenuBar gMainMenu;
 static void FindDevices() {
   WPI_EventHandle resolveEvent = multicastResolver->GetEventHandle();
 
-  int count = 0;
   bool timedOut = 0;
-  while (count < 10 && wpi::WaitForObject(resolveEvent, 0, &timedOut)) {
-    count++;
-    auto data = multicastResolver->GetData();
-    // search for MAC
-    auto macKey = std::find_if(data.txt.begin(), data.txt.end(),
-                               [](const auto& a) { return a.first == "MAC"; });
-    if (macKey != data.txt.end()) {
-      auto& mac = macKey->second;
-      foundDevices[mac] = std::make_pair(data.ipv4Address, data.hostName);
+  if (wpi::WaitForObject(resolveEvent, 0, &timedOut)) {
+    auto allData = multicastResolver->GetData();
+
+    for (auto&& data : allData) {
+      // search for MAC
+      auto macKey =
+          std::find_if(data.txt.begin(), data.txt.end(),
+                       [](const auto& a) { return a.first == "MAC"; });
+      if (macKey != data.txt.end()) {
+        auto& mac = macKey->second;
+        foundDevices[mac] = std::make_pair(data.ipv4Address, data.hostName);
+      }
     }
   }
 }
@@ -182,10 +184,13 @@ static void DisplayGui() {
     // Missing MDNS Implementation
     ImGui::Text("mDNS Implementation is missing.");
 #ifdef _WIN32
-    ImGui::Text("Windows 10 1809 or newer is required for this tool");;
+    ImGui::Text("Windows 10 1809 or newer is required for this tool");
+    ;
 #else
     ImGui::Text("avahi-client 3 and avahi-core 3 are required for this tool");
-    ImGui::Text("Install libavahi-client3 and libavahi-core3 from your package manager");
+    ImGui::Text(
+        "Install libavahi-client3 and libavahi-core3 from your package "
+        "manager");
 #endif
   }
   ImGui::Columns();
